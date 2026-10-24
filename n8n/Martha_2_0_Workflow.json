@@ -1,0 +1,670 @@
+{
+  "name": "Martha 2.0 | Daily Market Research | Two PDFs to Gmail",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "f374fc8f-a161-4f24-88b4-c645c4e4a481",
+      "name": "Every Day 8 AM ET",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site%3Areuters.com%20markets%20OR%20technology&hl=en-US&gl=US&ceid=US:en",
+        "options": {}
+      },
+      "id": "99e3dab2-6f95-4203-b9b9-4ca0255236fb",
+      "name": "Reuters Markets",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -980,
+        -330
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site%3Acnbc.com%20markets%20OR%20technology&hl=en-US&gl=US&ceid=US:en",
+        "options": {}
+      },
+      "id": "650ae94c-8e7f-4f03-92c0-31a7ce7d012e",
+      "name": "CNBC Markets",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -980,
+        -110
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site%3Abloomberg.com%20AI%20OR%20technology%20OR%20markets&hl=en-US&gl=US&ceid=US:en",
+        "options": {}
+      },
+      "id": "25cd8f40-d1cb-4c77-90a2-8a73fb45db60",
+      "name": "Bloomberg Technology",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -980,
+        110
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site%3Asec.gov%20earnings%20OR%20technology&hl=en-US&gl=US&ceid=US:en",
+        "options": {}
+      },
+      "id": "160eb0f4-0309-4cbb-92eb-be2e488102a7",
+      "name": "Company Filings",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -980,
+        330
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "f9a600a8-c3ad-4022-8dfe-9504e5513443",
+      "name": "Append News 1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -700,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "d256bc3b-8850-43b8-8673-e9fb8dd5c525",
+      "name": "Append News 2",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -490,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "925f0a68-ce30-4fb5-9aa0-5337a2098daf",
+      "name": "Append News 3",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -280,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst now = Date.now();\nconst items = $input.all().map(i=>i.json);\nconst seen = new Set();\nconst terms = /\\b(ai|artificial intelligence|chips?|semiconductors?|memory|hbm|ipos?|anthropic|openai|nvidia|amd|tsmc|microsoft|alphabet|google|amazon|meta|oracle|starlink|spacex|cyber\\w*|cloud|fed|inflation|bonds?|yields?|markets?|stocks?|earnings|telecom|oil|tariffs?|mergers?|acquisitions?|private equity|venture)\\b/i;\nconst ts = s => { const t = Date.parse(s); return Number.isNaN(t) ? 0 : t; };\nconst stories = items.map(x=>({\n title: String(x.title||'').trim(),\n link: x.link||x.guid||'',\n published: x.isoDate||x.pubDate||'',\n summary: String(x.contentSnippet||x.content||'').replace(/<[^>]*>/g,'').slice(0,450)\n})).filter(x=>x.title && x.link && (!x.published || now-Date.parse(x.published)<1000*60*60*96))\n .filter(x=>{let k=x.title.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,85);if(seen.has(k))return false;seen.add(k);return true;})\n .sort((a,b)=>Number(terms.test(b.title))-Number(terms.test(a.title)) || ts(b.published)-ts(a.published))\n .slice(0,45);\nreturn [{json:{stories, generatedAt:new Date().toISOString(), note:'RSS headlines and snippets are leads, not independently verified full articles.'}}];\n"
+      },
+      "id": "d5095ec1-6543-493e-955e-ef7be0ac5b3e",
+      "name": "Select Relevant News",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.MARTHA_MARKET_DATA_URL }}",
+        "options": {
+          "timeout": 25000
+        }
+      },
+      "id": "4dd347f6-d33f-4545-902c-0e7922704d3f",
+      "name": "Fetch Market Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -10,
+        240
+      ],
+      "continueOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "456df87b-e156-4814-84ef-6984f92aeae5",
+      "name": "Combine News and Prices",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        220,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst v=$input.first().json;\nconst news=$('Select Relevant News').first().json;\nconst rawPrices=$('Fetch Market Data').first()?.json || {};\nconst prices=(rawPrices.error || !Object.keys(rawPrices).length) ? {status:'Data unavailable', reason:String(rawPrices.error?.message || rawPrices.error || 'empty response')} : rawPrices;\nreturn [{json:{dateET:new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',weekday:'long',year:'numeric',month:'long',day:'numeric'}),generatedAt:news.generatedAt,stories:news.stories,marketData:prices,marketDataWarning:'Do not infer that this endpoint contains all requested benchmarks. Quote timestamp and previous-close status are mandatory. Omit unverified values.'}}];\n"
+      },
+      "id": "edb810f6-2427-4503-9038-2b6bedf067cb",
+      "name": "Prepare Research Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        430,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'gpt-4o',temperature:0.2,max_tokens:16000,response_format:{type:'json_object'},messages:[{role:'system',content:\"You are Martha 2.0, an accessible but rigorous investment research educator for a sophomore Spelman Economics student and Project ACCLAIM technology analyst ($4.9M fund, Russell 1000 equity benchmark). Create TWO publication-quality, self-contained HTML documents to render as PDFs. Return ONLY a JSON object with keys snapshot_html and intelligence_html; each value must be a full HTML document with embedded CSS, no external assets or scripts. US Letter page, print margins 0.55in, readable typography, restrained navy/teal palette, clear tables, concise paragraphs, small SVG/CSS diagrams where helpful, page breaks to target exactly TWO pages for snapshot and FIVE to SIX pages for intelligence. Use page-break-after strategically; avoid oversized blank areas. Images only if trustworthy licensed URLs provided; prefer inline SVG educational diagrams. Use input news as research leads, NOT proof of article contents; never claim to have read paywalled/full stories based only on headlines. Source every major claim with linked dated source from input; if unavailable say 'Unverified: requires primary-source check'. Never invent quotes, prices, IPO valuations or market changes. Quotes from marketData only, label exact as-of timestamps and market session; if marketData empty or erroneous show 'Data unavailable' instead of made-up numbers. Separate fact, management guidance, analyst forecast, rumor, and Martha's hypothesis. Prioritize: global markets, global IPO read-through to Anthropic/OpenAI only with caveats, private markets, US indices and sector rotation, fixed-income sentiment (1\\u20133 sentences snapshot), tech/AI/communications (hyperscaler CapEx vs AI ARR/free cash flow/ROIC, NVIDIA/AMD/TSMC, HBM DRAM NAND, enterprise SaaS, cybersecurity, SpaceX/Starlink vs carriers), separate macro, and 2\\u20133 cross-market connections with mechanisms. Define jargon on first use; detailed report includes 3\\u20135 finance terms, bull/bear and thesis-changing evidence, 3 ACCLAIM questions. For Friday/weekends show last cash close clearly. Do not fill space with fabricated details; transparently report missing evidence. Output valid JSON with HTML strings and no markdown fences.\"},{role:'user',content:JSON.stringify($json)}]}) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "0d1ea57f-7913-41a0-a4c7-e325a29414ba",
+      "name": "Martha Research and HTML",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        650,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst response=$input.first().json;\nlet raw=response.choices?.[0]?.message?.content;\nif(!raw) throw new Error('OpenAI returned no HTML JSON');\nif(response.choices[0].finish_reason==='length') throw new Error('OpenAI output was cut off at max_tokens; shorten the reports or raise max_tokens');\nraw=raw.trim().replace(/^```(?:json)?\\s*/i,'').replace(/\\s*```$/,'');\nconst doc=JSON.parse(raw);\nfor(const key of ['snapshot_html','intelligence_html']) if(!doc[key]?.includes('<html')) throw new Error('Missing '+key);\nconst snap=await this.helpers.prepareBinaryData(Buffer.from(doc.snapshot_html,'utf8'),'index.html','text/html');\nconst long=await this.helpers.prepareBinaryData(Buffer.from(doc.intelligence_html,'utf8'),'index.html','text/html');\nreturn [{json:{generatedAt:new Date().toISOString()},binary:{snapshotHtml:snap,intelligenceHtml:long}}];\n"
+      },
+      "id": "e167c34b-5714-46df-a20b-c604ced07917",
+      "name": "Make HTML Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        870,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MARTHA_GOTENBERG_URL || 'http://gotenberg:3000' }}/forms/chromium/convert/html",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "files",
+              "inputDataFieldName": "snapshotHtml"
+            },
+            {
+              "parameterType": "formData",
+              "name": "preferCssPageSize",
+              "value": "true"
+            },
+            {
+              "parameterType": "formData",
+              "name": "printBackground",
+              "value": "true"
+            },
+            {
+              "parameterType": "formData",
+              "name": "paperWidth",
+              "value": "8.5"
+            },
+            {
+              "parameterType": "formData",
+              "name": "paperHeight",
+              "value": "11"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginTop",
+              "value": "0.55"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginBottom",
+              "value": "0.55"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginLeft",
+              "value": "0.55"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginRight",
+              "value": "0.55"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "476c74be-b4f0-4a4b-a7bd-69c5fd92b928",
+      "name": "Render Snapshot PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -90
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MARTHA_GOTENBERG_URL || 'http://gotenberg:3000' }}/forms/chromium/convert/html",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "files",
+              "inputDataFieldName": "intelligenceHtml"
+            },
+            {
+              "parameterType": "formData",
+              "name": "preferCssPageSize",
+              "value": "true"
+            },
+            {
+              "parameterType": "formData",
+              "name": "printBackground",
+              "value": "true"
+            },
+            {
+              "parameterType": "formData",
+              "name": "paperWidth",
+              "value": "8.5"
+            },
+            {
+              "parameterType": "formData",
+              "name": "paperHeight",
+              "value": "11"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginTop",
+              "value": "0.55"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginBottom",
+              "value": "0.55"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginLeft",
+              "value": "0.55"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginRight",
+              "value": "0.55"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "853245d1-6c7f-4e13-a9c1-5d9431abe3b1",
+      "name": "Render Intelligence PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "28c26114-6f02-49bc-ab1f-9ca934de3587",
+      "name": "Combine Two PDFs",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1330,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst snapshot=$('Render Snapshot PDF').first().binary?.data;\nconst intelligence=$('Render Intelligence PDF').first().binary?.data;\nif(!snapshot||!intelligence) throw new Error('Both PDF renderings must succeed before email is sent');\nsnapshot.fileName='Martha_Market_Snapshot.pdf';\nintelligence.fileName='Martha_Market_Intelligence.pdf';\nreturn [{json:{to:'angelikabell10@gmail.com',subject:'Martha 2.0 | Daily Market Briefs | '+new Date().toLocaleDateString('en-US',{timeZone:'America/New_York'}),body:'Good morning! Attached are your 2-page Martha Market Snapshot and your 5–6-page Market Intelligence Report. Quotes are timestamped within the reports; markets may be closed or premarket.'},binary:{snapshot,intelligence}}];\n"
+      },
+      "id": "0f542a83-5cf6-45bc-803c-d8b46c933558",
+      "name": "Prepare Gmail Attachments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "snapshot"
+              },
+              {
+                "property": "intelligence"
+              }
+            ]
+          },
+          "appendAttribution": false
+        }
+      },
+      "id": "6a24bce2-4b56-473a-8cbb-9c68a6f636f0",
+      "name": "Send Both PDFs via Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        60
+      ]
+    }
+  ],
+  "connections": {
+    "Every Day 8 AM ET": {
+      "main": [
+        [
+          {
+            "node": "Reuters Markets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CNBC Markets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Bloomberg Technology",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Company Filings",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Market Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reuters Markets": {
+      "main": [
+        [
+          {
+            "node": "Append News 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CNBC Markets": {
+      "main": [
+        [
+          {
+            "node": "Append News 1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Append News 1": {
+      "main": [
+        [
+          {
+            "node": "Append News 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bloomberg Technology": {
+      "main": [
+        [
+          {
+            "node": "Append News 2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Append News 2": {
+      "main": [
+        [
+          {
+            "node": "Append News 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Company Filings": {
+      "main": [
+        [
+          {
+            "node": "Append News 3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Append News 3": {
+      "main": [
+        [
+          {
+            "node": "Select Relevant News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Relevant News": {
+      "main": [
+        [
+          {
+            "node": "Combine News and Prices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Market Data": {
+      "main": [
+        [
+          {
+            "node": "Combine News and Prices",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine News and Prices": {
+      "main": [
+        [
+          {
+            "node": "Prepare Research Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Research Payload": {
+      "main": [
+        [
+          {
+            "node": "Martha Research and HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Martha Research and HTML": {
+      "main": [
+        [
+          {
+            "node": "Make HTML Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make HTML Files": {
+      "main": [
+        [
+          {
+            "node": "Render Snapshot PDF",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Render Intelligence PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Snapshot PDF": {
+      "main": [
+        [
+          {
+            "node": "Combine Two PDFs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Intelligence PDF": {
+      "main": [
+        [
+          {
+            "node": "Combine Two PDFs",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Two PDFs": {
+      "main": [
+        [
+          {
+            "node": "Prepare Gmail Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Gmail Attachments": {
+      "main": [
+        [
+          {
+            "node": "Send Both PDFs via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/New_York"
+  },
+  "active": false,
+  "pinData": {}
+}
